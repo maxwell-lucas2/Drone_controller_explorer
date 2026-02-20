@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Advanced Quadcopter Control Lab</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { margin: 0; display: flex; font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #eee; }
+        #canvas-container { flex-grow: 1; position: relative; }
+        #sidebar { width: 320px; background: #151515; padding: 20px; border-left: 2px solid #333; height: 100vh; overflow-y: auto; }
+        .control-group { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #444; }
+        h2 { font-size: 1.2rem; color: #00d4ff; margin-top: 0; }
+        input[type=range] { width: 100%; cursor: pointer; }
+        .stats { font-family: monospace; color: #00ff88; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <div id="canvas-container">
+        <div style="position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.5); padding: 10px;">
+            <div id="telemetry" class="stats">Alt: 0.00m | Mode: PID</div>
+        </div>
+    </div>
+
+    <div id="sidebar">
+        <h2>Control Strategy</h2>
+        <select id="algo" style="width: 100%; padding: 8px; margin-bottom: 20px;">
+            <option value="PID">Cascaded PID</option>
+            <option value="SMC">SMC Attitude</option>
+            <option value="STS">Super-Twisting SMC</option>
+        </select>
+
+        <div class="control-group">
+            <label>Position P-Gain: <span id="v-kp">2.0</span></label>
+            <input type="range" id="kp" min="0" max="10" step="0.1" value="2">
+        </div>
+
+        <div class="control-group">
+            <label>SMC Sliding Gain (λ): <span id="v-lambda">1.5</span></label>
+            <input type="range" id="lambda" min="0.1" max="5" step="0.1" value="1.5">
+        </div>
+
+        <canvas id="errorChart" width="300" height="150"></canvas>
+        <button onclick="reset()" style="width: 100%; padding: 10px; background: #ff4444; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px;">RESET DRONE</button>
+    </div>
+
+<script>
+    // --- SCENE SETUP ---
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, (window.innerWidth - 320) / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth - 320, window.innerHeight);
+    document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+    // --- DRONE GEOMETRY ---
+    const droneGroup = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.05, 0.1), new THREE.MeshStandardMaterial({color: 0x555555}));
+    const body2 = body.clone(); body2.rotation.y = Math.PI/2;
+    droneGroup.add(body, body2);
+    // Add 4 rotors
+    [ [0.3, 0.3], [0.3, -0.3], [-0.3, 0.3], [-0.3, -0.3] ].forEach(pos => {
+        const rotor = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.02), new THREE.MeshStandardMaterial({color: 0x00d4ff, transparent: true, opacity: 0.5}));
+        rotor.position.set(pos[0], 0.05, pos[1]);
+        droneGroup.add(rotor);
+    });
+    scene.add(droneGroup);
+
+    // Lighting & Floor
+    scene.add(new THREE.GridHelper(50, 50, 0x444444, 0x222222));
+    const sun = new THREE.DirectionalLight(0xffffff, 1);
+    sun.position.set(5, 10, 5);
+    scene.add(sun, new THREE.AmbientLight(0x404040));
+    camera.position.set(4, 4, 8);
+    camera.lookAt(0, 0, 0);
+
+    // --- PHYSICS STATE ---
+    let state = { pos: new THREE.Vector3(0, 0, 0), vel: new THREE.Vector3(0,0,0), rot: new THREE.Euler(0,0,0), w: new THREE.Vector3(0,0,0) };
+    let target = new THREE.Vector3(0, 5, 0);
+    let integral_s = 0; // For Super-Twisting
+
+    function loop() {
+        requestAnimationFrame(loop);
+        
+        const algo = document.getElementById('algo').value;
+        const Kp = parseFloat(document.getElementById('kp').value);
+        const L = parseFloat(document.getElementById('lambda').value);
+
+        // 1. POSITION OUTER LOOP (P-Control for Setpoint)
+        let errorZ = target.y - state.pos.y;
+        let thrust = 9.81 + (errorZ * Kp) - state.vel.y * 1.5;
+
+        // 2. ATTITUDE INNER LOOP (Strategy Switching)
+        let torqueX = 0;
+        let s = state.w.x + L * state.rot.x; // Surface
+
+        if(algo === "PID") {
+            torqueX = -state.rot.x * 10 - state.w.x * 5;
+        } else if(algo === "SMC") {
+            torqueX = -L * state.w.x - 5.0 * Math.sign(s);
+        } else if(algo === "STS") {
+            integral_s += -2.0 * Math.sign(s) * 0.01;
+            torqueX = -3.0 * Math.sqrt(Math.abs(s)) * Math.sign(s) + integral_s;
+        }
+
+        // 3. INTEGRATE
+        state.vel.y += (thrust - 9.81) * 0.01;
+        state.pos.y += state.vel.y * 0.01;
+        state.w.x += torqueX * 0.01;
+        state.rot.x += state.w.x * 0.01;
+
+        // Apply to Visuals
+        droneGroup.position.copy(state.pos);
+        droneGroup.rotation.copy(state.rot);
+        
+        document.getElementById('telemetry').innerText = `Alt: ${state.pos.y.toFixed(2)}m | Mode: ${algo}`;
+        renderer.render(scene, camera);
+    }
+    
+    function reset() { state.pos.set(0,0,0); state.vel.set(0,0,0); state.rot.set(0,0,0); state.w.set(0,0,0); integral_s = 0; }
+    loop();
+</script>
+</body>
+</html>
