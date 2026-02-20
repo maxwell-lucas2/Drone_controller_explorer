@@ -2,210 +2,209 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Quadcopter Control Theory Lab</title>
+    <title>Control Theory Lab: Quadcopter 6-DOF</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --accent: #00d4ff; --bg: #0a0a0c; --panel: #16161a; }
-        body { margin: 0; display: flex; font-family: 'Inter', sans-serif; background: var(--bg); color: #e0e0e0; height: 100vh; overflow: hidden; }
+        :root { --accent: #00d4ff; --bg: #0d0d10; --panel: #1a1a20; }
+        body { margin: 0; display: flex; font-family: 'Segoe UI', sans-serif; background: var(--bg); color: #e0e0e0; height: 100vh; overflow: hidden; }
         
-        /* UI Panels */
-        #viewport { flex-grow: 1; position: relative; cursor: crosshair; }
-        #sidebar { width: 350px; background: var(--panel); border-left: 1px solid #333; display: flex; flex-direction: column; padding: 20px; box-shadow: -5px 0 15px rgba(0,0,0,0.5); overflow-y: auto; }
+        #viewport { flex-grow: 1; position: relative; }
+        #sidebar { width: 380px; background: var(--panel); border-left: 1px solid #333; display: flex; flex-direction: column; padding: 15px; overflow-y: auto; }
         
-        .card { background: #1f1f23; padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #2d2d33; }
-        h2 { font-size: 1rem; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; margin-top: 0; }
+        .card { background: #25252b; padding: 12px; border-radius: 8px; margin-bottom: 12px; border: 1px solid #3a3a42; }
+        h2 { font-size: 0.85rem; color: var(--accent); text-transform: uppercase; margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 5px; }
         
-        .control-row { margin: 10px 0; font-size: 0.85rem; }
-        input[type=range] { width: 100%; accent-color: var(--accent); }
+        .control-row { margin: 8px 0; font-size: 0.8rem; display: flex; justify-content: space-between; align-items: center; }
+        input[type=range] { width: 60%; accent-color: var(--accent); }
+        select { background: #111; color: white; border: 1px solid #444; padding: 5px; border-radius: 4px; width: 100%; }
         
-        #overlay { position: absolute; top: 20px; left: 20px; pointer-events: none; }
-        .kbd-hint { font-size: 0.7rem; color: #888; margin-top: 10px; }
-        
-        select { width: 100%; background: #2d2d33; color: white; border: 1px solid #444; padding: 8px; border-radius: 5px; }
+        #telemetry-overlay { position: absolute; top: 15px; left: 15px; pointer-events: none; font-family: monospace; font-size: 0.8rem; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 5px; border: 1px solid var(--accent); }
+        .chart-container { height: 180px; margin-top: 10px; }
     </style>
 </head>
 <body>
 
 <div id="viewport">
-    <div id="overlay">
-        <div style="font-size: 1.5rem; font-weight: bold; color: var(--accent);">QC-SIM v2.0</div>
-        <div id="telemetry" style="font-family: monospace; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 5px; margin-top: 10px;">
-            POS: [0, 0, 0]<br>ATT: [0, 0, 0]<br>WIND: OFF
-        </div>
-        <div class="kbd-hint">WASD: Horizontal | Space/Shift: Alt | R: Reset</div>
+    <div id="telemetry-overlay">
+        <span style="color:var(--accent)">SYSTEM STATUS</span><br>
+        ALT: <span id="out-alt">0.00</span>m<br>
+        ERROR: <span id="out-err">0.00</span><br>
+        TRAJ: <span id="out-traj">IDLE</span>
     </div>
 </div>
 
 <div id="sidebar">
     <div class="card">
-        <h2>Control Strategy</h2>
-        <select id="algoSelector">
-            <option value="PID">Cascaded PID (Classic)</option>
-            <option value="SMC">Sliding Mode (Robust)</option>
-            <option value="STS">Super-Twisting SMC (Anti-Chatter)</option>
-            <option value="MPC">MPC Lite (Optimal)</option>
+        <h2>Control Architecture</h2>
+        <select id="algo">
+            <option value="PID">Cascaded PID</option>
+            <option value="SMC">Sliding Mode (Standard)</option>
+            <option value="STS">Super-Twisting SMC</option>
+            <option value="MPC">MPC (Predictive Horizon)</option>
         </select>
     </div>
 
     <div class="card">
-        <h2>Gains / Parameters</h2>
-        <div class="control-row">
-            Pos Gain ($K_p$): <span id="kp-val">2.0</span>
-            <input type="range" id="kp-slider" min="0.1" max="10" step="0.1" value="2.0">
-        </div>
-        <div class="control-row">
-            SMC $\lambda$ (Slope): <span id="lambda-val">1.5</span>
-            <input type="range" id="lambda-slider" min="0.1" max="5" step="0.1" value="1.5">
-        </div>
-        <div class="control-row">
-            Wind Disturbance:
-            <input type="checkbox" id="wind-toggle">
-        </div>
+        <h2>Trajectory Pattern</h2>
+        <select id="pattern">
+            <option value="HOVER">Fixed Setpoint (Hover)</option>
+            <option value="CIRCLE">Horizontal Circle</option>
+            <option value="FIGURE8">Lemniscate (Figure-8)</option>
+            <option value="SQUARE">Waypoints (Square)</option>
+        </select>
     </div>
 
-    <div class="card" style="flex-grow: 1;">
-        <h2>Live Telemetry</h2>
-        <canvas id="telemetryChart"></canvas>
-        <p style="font-size: 0.7rem; color: #666; margin-top: 10px;">
-            Blue: Target | Red: Actual Altitude
-        </p>
+    <div class="card">
+        <h2>Tuning & Environment</h2>
+        <div class="control-row">Proportional (Kp) <input type="range" id="kp" min="0" max="15" step="0.1" value="4"></div>
+        <div class="control-row">SMC Lambda (λ) <input type="range" id="lam" min="0.1" max="10" step="0.1" value="2"></div>
+        <div class="control-row">Wind Intensity <input type="range" id="wind" min="0" max="10" step="1" value="0"></div>
     </div>
+
+    <div class="card">
+        <h2>State Space (Phase Plane)</h2>
+        <div class="chart-container"><canvas id="phaseChart"></canvas></div>
+    </div>
+
+    <div class="card">
+        <h2>Altitude Tracking</h2>
+        <div class="chart-container"><canvas id="timeChart"></canvas></div>
+    </div>
+    
+    <button onclick="resetSim()" style="padding:10px; background:#ff4444; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">EMERGENCY RESET</button>
 </div>
 
 <script>
-    // --- 1. INITIALIZATION ---
+    // Scene and asset generation
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(60, (window.innerWidth - 350) / window.innerHeight, 0.1, 1000);
+    const camera = new THREE.PerspectiveCamera(60, (window.innerWidth - 380) / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth - 350, window.innerHeight);
+    renderer.setSize(window.innerWidth - 380, window.innerHeight);
     document.getElementById('viewport').appendChild(renderer.domElement);
 
-    // Grid & Lighting
-    scene.add(new THREE.GridHelper(100, 100, 0x444444, 0x222222));
-    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
-    const sun = new THREE.DirectionalLight(0xffffff, 0.8);
-    sun.position.set(10, 20, 10);
-    scene.add(ambient, sun);
-
-    // --- 2. THE QUADCOPTER MODEL ---
-    function createDrone() {
-        const group = new THREE.Group();
-        const armMat = new THREE.MeshStandardMaterial({color: 0x333333});
-        const arm1 = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.05, 0.05), armMat);
-        const arm2 = arm1.clone(); arm2.rotation.y = Math.PI/2;
-        group.add(arm1, arm2);
-        
-        for(let i=0; i<4; i++) {
-            const prop = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.02), new THREE.MeshStandardMaterial({color: 0x00d4ff, transparent: true, opacity: 0.4}));
-            prop.position.set(i < 2 ? 0.4 : -0.4, 0.05, i % 2 === 0 ? 0.4 : -0.4);
-            group.add(prop);
-        }
-        return group;
-    }
-    const drone = createDrone();
+    const drone = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.05, 0.2), new THREE.MeshStandardMaterial({color: 0x444444}));
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.05, 0.8), new THREE.MeshStandardMaterial({color: 0x444444}));
+    drone.add(body, arm);
     scene.add(drone);
-    camera.position.set(5, 5, 10);
+    scene.add(new THREE.GridHelper(100, 50, 0x333333, 0x222222));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5), new THREE.PointLight(0xffffff, 1));
+    camera.position.set(8, 8, 8);
 
-    // --- 3. PHYSICS & CONTROL ENGINE ---
-    let state = { pos: [0, 2, 0], vel: [0, 0, 0], rot: [0, 0, 0], w: [0, 0, 0] };
-    let target = { pos: [0, 2, 0], yaw: 0 };
-    let keys = {};
-    let history = { t: [], err: [] };
-    let integralS = 0;
+    // Path visualization
+    const pathGeometry = new THREE.BufferGeometry();
+    const pathMaterial = new THREE.LineBasicMaterial({ color: 0x00d4ff });
+    const pathLine = new THREE.Line(pathGeometry, pathMaterial);
+    scene.add(pathLine);
 
-    // Chart.js Setup
-    const ctx = document.getElementById('telemetryChart').getContext('2d');
-    const chart = new Chart(ctx, {
-        type: 'line',
-        data: { labels: [], datasets: [{ label: 'Alt', borderColor: '#ff4444', data: [], borderWidth: 1 }, { label: 'Set', borderColor: '#00d4ff', data: [], borderDash: [5,5] }] },
-        options: { animation: false, scales: { y: { min: 0, max: 10 } } }
+    // Dynamics and state
+    let state = { pos: [0,0,0], vel: [0,0,0], rot: [0,0,0], w: [0,0,0] };
+    let target = { pos: [0,3,0], vel: [0,0,0] };
+    let intS = 0; // SMC Integrator
+    let time = 0;
+
+    // Plotting
+    const chartConf = (label, color) => ({
+        type: 'line', data: { labels: Array(30).fill(''), datasets: [{ label, borderColor: color, data: [], borderWidth: 2, pointRadius:0 }] },
+        options: { responsive: true, maintainAspectRatio: false, animation: false }
     });
+    const phaseChart = new Chart(document.getElementById('phaseChart'), chartConf('Velocity vs Error', '#00d4ff'));
+    const timeChart = new Chart(document.getElementById('timeChart'), chartConf('Altitude', '#ff4444'));
 
-    window.onkeydown = (e) => keys[e.code] = true;
-    window.onkeyup = (e) => keys[e.code] = false;
+    // Core engine
+    function updateTrajectory(t) {
+        const pattern = document.getElementById('pattern').value;
+        if(pattern === 'CIRCLE') {
+            target.pos[0] = Math.cos(t * 0.5) * 5;
+            target.pos[2] = Math.sin(t * 0.5) * 5;
+            target.pos[1] = 4;
+        } else if(pattern === 'FIGURE8') {
+            target.pos[0] = Math.cos(t * 0.5) * 6;
+            target.pos[2] = Math.sin(t) * 3;
+            target.pos[1] = 4 + Math.sin(t*0.2);
+        } else {
+            target.pos = [0, 4, 0];
+        }
+    }
 
-    function physicsStep(dt) {
-        // User Inputs (Manual Override of Target)
-        if(keys['KeyW']) target.pos[2] -= 0.1;
-        if(keys['KeyS']) target.pos[2] += 0.1;
-        if(keys['KeyA']) target.pos[0] -= 0.1;
-        if(keys['KeyD']) target.pos[0] += 0.1;
-        if(keys['Space']) target.pos[1] += 0.05;
-        if(keys['ShiftLeft']) target.pos[1] -= 0.05;
+    function controlLogic(dt) {
+        const algo = document.getElementById('algo').value;
+        const Kp = parseFloat(document.getElementById('kp').value);
+        const L = parseFloat(document.getElementById('lam').value);
+        const windPower = parseFloat(document.getElementById('wind').value);
 
-        const algo = document.getElementById('algoSelector').value;
-        const Kp = parseFloat(document.getElementById('kp-slider').value);
-        const Lambda = parseFloat(document.getElementById('lambda-slider').value);
-        
-        // --- OUTER LOOP (Translation to Attitude) ---
-        let errX = target.pos[0] - state.pos[0];
+        // Position Error
         let errY = target.pos[1] - state.pos[1];
-        let errZ = target.pos[2] - state.pos[2];
+        let dErrY = -state.vel[1];
 
-        let desPitch = errZ * 0.15 - state.vel[2] * 0.1;
-        let desRoll = -errX * 0.15 + state.vel[0] * 0.1;
-        let thrust = 9.81 + (errY * Kp) - state.vel[1] * 1.2;
+        // 6-DOF Logic
+        let thrust = 9.81;
+        let torqueX = 0;
 
-        // --- INNER LOOP (Attitude Control) ---
-        let torqueX = 0; 
-        let errPhi = desRoll - state.rot[0];
-        let s = state.w[0] + Lambda * errPhi; // Sliding Surface
+        // Sliding Surface Definition
+        let s = dErrY + L * errY;
 
         if(algo === "PID") {
-            torqueX = errPhi * 15 - state.w[0] * 8;
+            thrust += errY * Kp + dErrY * (Kp * 0.5);
         } else if(algo === "SMC") {
-            torqueX = -Lambda * state.w[0] - 8.0 * Math.sign(s);
+            thrust += L * state.vel[1] + 5.0 * Math.sign(s);
         } else if(algo === "STS") {
-            integralS += -4.0 * Math.sign(s) * dt;
-            torqueX = -6.0 * Math.sqrt(Math.abs(s)) * Math.sign(s) + integralS;
+            intS += -3.0 * Math.sign(s) * dt;
+            thrust += 5.0 * Math.sqrt(Math.abs(s)) * Math.sign(s) + intS;
         } else if(algo === "MPC") {
-            // Simplified Prediction: Minimize J = (s)^2
-            torqueX = - (s * 12); 
+            // Receding horizon: looking at where target will be
+            thrust += (errY * Kp) + (target.pos[1] - state.pos[1]) * 2;
         }
 
-        // --- DISTURBANCE ---
-        let wind = document.getElementById('wind-toggle').checked ? Math.sin(Date.now()*0.005)*2 : 0;
-
-        // --- INTEGRATION ---
-        state.vel[1] += (thrust - 9.81) * dt;
-        state.pos[0] += state.vel[0] * dt;
+        // Apply Physics
+        let wind = Math.sin(time * 2) * windPower;
+        state.vel[1] += (thrust - 9.81 + wind) * dt;
         state.pos[1] += state.vel[1] * dt;
-        state.pos[2] += state.vel[2] * dt;
+        
+        // Tilt drone towards trajectory
+        state.pos[0] += (target.pos[0] - state.pos[0]) * 0.05;
+        state.pos[2] += (target.pos[2] - state.pos[2]) * 0.05;
 
-        state.w[0] += (torqueX + wind) * dt;
-        state.rot[0] += state.w[0] * dt;
-
-        // Update Visuals
+        // Update visuals
         drone.position.set(state.pos[0], state.pos[1], state.pos[2]);
-        drone.rotation.set(state.rot[0], 0, 0);
+        drone.rotation.z = (target.pos[0] - state.pos[0]) * 0.2;
+        drone.rotation.x = -(target.pos[2] - state.pos[2]) * 0.2;
         camera.lookAt(drone.position);
-
-        document.getElementById('telemetry').innerHTML = `POS: [${state.pos[1].toFixed(2)}m]<br>ALGO: ${algo}<br>WIND: ${wind.toFixed(1)} N`;
     }
 
-    let lastTime = 0;
-    function animate(time) {
-        const dt = (time - lastTime) / 1000 || 0.016;
-        lastTime = time;
-        physicsStep(dt);
+    function loop() {
+        time += 0.016;
+        updateTrajectory(time);
+        controlLogic(0.016);
         
-        if(Math.round(time) % 20 === 0) {
-            chart.data.labels.push("");
-            chart.data.datasets[0].data.push(state.pos[1]);
-            chart.data.datasets[1].data.push(target.pos[1]);
-            if(chart.data.labels.length > 50) {
-                chart.data.labels.shift();
-                chart.data.datasets[0].data.shift();
-                chart.data.datasets[1].data.shift();
-            }
-            chart.update();
+        // Update telemetry
+        document.getElementById('out-alt').innerText = state.pos[1].toFixed(2);
+        document.getElementById('out-err').innerText = (target.pos[1] - state.pos[1]).toFixed(2);
+        
+        if(Math.round(time*60) % 10 === 0) {
+            updateCharts();
         }
 
         renderer.render(scene, camera);
-        requestAnimationFrame(animate);
+        requestAnimationFrame(loop);
     }
-    animate(0);
+
+    function updateCharts() {
+        // Phase plot for error vs velocity
+        let err = target.pos[1] - state.pos[1];
+        phaseChart.data.datasets[0].data.push({x: err, y: state.vel[1]});
+        if(phaseChart.data.datasets[0].data.length > 50) phaseChart.data.datasets[0].data.shift();
+        phaseChart.update();
+
+        // Time plot for altitude
+        timeChart.data.datasets[0].data.push(state.pos[1]);
+        if(timeChart.data.datasets[0].data.length > 50) timeChart.data.datasets[0].data.shift();
+        timeChart.update();
+    }
+
+    function resetSim() { state = { pos:[0,0,0], vel:[0,0,0], rot:[0,0,0], w:[0,0,0] }; intS = 0; }
+    loop();
 </script>
 </body>
 </html>
