@@ -181,4 +181,4 @@ quadrotor-control-lab/
 
 ## License
 
-MIT — Use freely for education and research.
+UVM — Use freely for education and research.
