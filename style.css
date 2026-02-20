@@ -1,0 +1,543 @@
+/* ===================================================================
+   style.css — Quadrotor Control Lab
+   Aesthetic: Aerospace Mission Control / Oscilloscope
+   =================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap');
+
+:root {
+    --bg-deep:     #06080c;
+    --bg-panel:    #0c1018;
+    --bg-card:     #111722;
+    --bg-input:    #0a0f18;
+    --border:      #1c2838;
+    --border-glow: #1a3050;
+    --cyan:        #00d4ff;
+    --cyan-dim:    #0088aa;
+    --amber:       #ffaa22;
+    --red:         #ff3344;
+    --green:       #22ff66;
+    --blue:        #4488ff;
+    --text:        #c8d4e0;
+    --text-dim:    #607080;
+    --text-bright: #e8f0f8;
+    --font-mono:   'JetBrains Mono', 'Fira Code', monospace;
+    --font-body:   'Outfit', system-ui, sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg-deep);
+    color: var(--text);
+    font-family: var(--font-body);
+}
+
+/* ===================================================================
+   LAYOUT
+   =================================================================== */
+
+.app-layout {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+}
+
+/* --- 3D Viewport --- */
+#viewport {
+    flex: 1;
+    position: relative;
+    min-width: 0;
+    background: var(--bg-deep);
+}
+
+#viewport canvas {
+    display: block;
+}
+
+/* --- Sidebar --- */
+#sidebar {
+    width: 420px;
+    min-width: 420px;
+    background: var(--bg-panel);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+}
+
+#sidebar::-webkit-scrollbar { width: 5px; }
+#sidebar::-webkit-scrollbar-track { background: transparent; }
+#sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* --- Sidebar Header --- */
+.sidebar-header {
+    padding: 16px 18px 12px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(0,212,255,0.04) 0%, transparent 100%);
+}
+
+.sidebar-header h1 {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.15em;
+    color: var(--cyan);
+    text-transform: uppercase;
+    margin-bottom: 2px;
+}
+
+.sidebar-header .subtitle {
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+}
+
+/* ===================================================================
+   CARDS
+   =================================================================== */
+
+.card {
+    margin: 8px 12px;
+    padding: 12px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    position: relative;
+}
+
+.card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px;
+    height: 100%;
+    background: var(--cyan-dim);
+    border-radius: 6px 0 0 6px;
+    opacity: 0.5;
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.card-header h2 {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--cyan);
+}
+
+.card-header .tag {
+    font-family: var(--font-mono);
+    font-size: 0.55rem;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: rgba(0,212,255,0.1);
+    color: var(--cyan-dim);
+    border: 1px solid rgba(0,212,255,0.15);
+}
+
+/* ===================================================================
+   FORM CONTROLS
+   =================================================================== */
+
+select {
+    width: 100%;
+    background: var(--bg-input);
+    color: var(--text-bright);
+    border: 1px solid var(--border);
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2300d4ff'%3E%3Cpath d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+}
+
+select:focus { border-color: var(--cyan-dim); }
+select:hover { border-color: var(--cyan-dim); }
+
+/* --- Gain Sliders --- */
+.gain-row {
+    display: grid;
+    grid-template-columns: 1fr 120px 48px;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 0.72rem;
+}
+
+.gain-row label {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    cursor: help;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.gain-value {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--amber);
+    text-align: right;
+    font-weight: 500;
+}
+
+input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--cyan);
+    border: 2px solid var(--bg-card);
+    box-shadow: 0 0 6px rgba(0,212,255,0.4);
+    cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--cyan);
+    border: 2px solid var(--bg-card);
+    cursor: pointer;
+}
+
+/* ===================================================================
+   TELEMETRY OVERLAY
+   =================================================================== */
+
+#telemetry-overlay {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    pointer-events: none;
+    z-index: 10;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    line-height: 1.6;
+    background: rgba(6, 8, 12, 0.85);
+    backdrop-filter: blur(8px);
+    padding: 12px 16px;
+    border-radius: 6px;
+    border: 1px solid var(--border-glow);
+    min-width: 200px;
+}
+
+#telemetry-overlay .tel-title {
+    color: var(--cyan);
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(0,212,255,0.15);
+}
+
+#telemetry-overlay .tel-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+#telemetry-overlay .tel-label { color: var(--text-dim); }
+#telemetry-overlay .tel-val { color: var(--text-bright); font-weight: 500; }
+#telemetry-overlay .tel-val.warn { color: var(--amber); }
+#telemetry-overlay .tel-val.ok { color: var(--green); }
+
+#rec-indicator {
+    display: none;
+    color: var(--red);
+    font-weight: 600;
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+/* ===================================================================
+   BUTTONS
+   =================================================================== */
+
+.btn-group {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.btn {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    padding: 7px 12px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-input);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.03em;
+    flex: 1;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.btn:hover {
+    border-color: var(--cyan-dim);
+    background: rgba(0,212,255,0.05);
+    color: var(--text-bright);
+}
+
+.btn.danger {
+    border-color: rgba(255,51,68,0.3);
+    color: var(--red);
+}
+
+.btn.danger:hover {
+    background: rgba(255,51,68,0.1);
+    border-color: var(--red);
+}
+
+.btn.recording {
+    border-color: var(--red);
+    color: var(--red);
+    background: rgba(255,51,68,0.08);
+    animation: pulse-border 1.5s infinite;
+}
+
+@keyframes pulse-border {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,51,68,0); }
+    50% { box-shadow: 0 0 8px 0 rgba(255,51,68,0.3); }
+}
+
+.btn.active {
+    border-color: var(--amber);
+    color: var(--amber);
+}
+
+/* ===================================================================
+   CHARTS
+   =================================================================== */
+
+.chart-container {
+    height: 150px;
+    margin-top: 6px;
+    position: relative;
+}
+
+.chart-tab-bar {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 6px;
+}
+
+.chart-tab {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    padding: 3px 8px;
+    border-radius: 3px;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    transition: all 0.15s;
+}
+
+.chart-tab:hover { color: var(--text); border-color: var(--border); }
+.chart-tab.active {
+    background: rgba(0,212,255,0.08);
+    border-color: var(--cyan-dim);
+    color: var(--cyan);
+}
+
+/* ===================================================================
+   INFO / DESCRIPTION PANELS
+   =================================================================== */
+
+.info-text {
+    font-size: 0.72rem;
+    line-height: 1.6;
+    color: var(--text-dim);
+    margin-top: 6px;
+}
+
+.info-text strong { color: var(--text-bright); }
+.info-text code {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    background: rgba(0,212,255,0.06);
+    padding: 1px 4px;
+    border-radius: 2px;
+    color: var(--cyan);
+}
+.info-text em { color: var(--amber); font-style: normal; }
+
+/* ===================================================================
+   KEYBOARD HINTS
+   =================================================================== */
+
+#keyboard-hint {
+    display: none;
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: rgba(0,212,255,0.04);
+    border: 1px solid rgba(0,212,255,0.1);
+    border-radius: 4px;
+    font-size: 0.68rem;
+    line-height: 1.7;
+}
+
+.key-badge {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    padding: 1px 5px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--bg-input);
+    color: var(--text-bright);
+    margin: 0 2px;
+    min-width: 20px;
+    text-align: center;
+}
+
+/* ===================================================================
+   CUSTOM WAYPOINTS
+   =================================================================== */
+
+#custom-wp-panel { display: none; }
+
+.wp-input-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-top: 6px;
+}
+
+.wp-input-row input[type="number"] {
+    width: 65px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text-bright);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    padding: 5px 6px;
+    border-radius: 3px;
+    outline: none;
+    text-align: center;
+}
+
+.wp-input-row input:focus { border-color: var(--cyan-dim); }
+
+.wp-input-row label {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--text-dim);
+}
+
+#wp-list {
+    margin-top: 6px;
+    max-height: 100px;
+    overflow-y: auto;
+}
+
+.wp-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 0;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+
+.wp-remove {
+    background: none;
+    border: none;
+    color: var(--red);
+    cursor: pointer;
+    font-size: 0.75rem;
+    padding: 0 4px;
+    opacity: 0.6;
+}
+
+.wp-remove:hover { opacity: 1; }
+
+/* ===================================================================
+   ENVIRONMENT CONTROLS
+   =================================================================== */
+
+.env-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    font-size: 0.72rem;
+}
+
+.env-label {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--text-dim);
+}
+
+.env-value {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--amber);
+    min-width: 50px;
+    text-align: right;
+}
+
+/* ===================================================================
+   RESPONSIVE ADJUSTMENTS
+   =================================================================== */
+
+@media (max-width: 1200px) {
+    #sidebar { width: 360px; min-width: 360px; }
+}
+
+@media (max-width: 900px) {
+    .app-layout { flex-direction: column; }
+    #viewport { height: 45vh; }
+    #sidebar {
+        width: 100%;
+        min-width: 100%;
+        height: 55vh;
+    }
+}

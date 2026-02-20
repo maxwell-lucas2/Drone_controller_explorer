@@ -2,209 +2,238 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Control Theory Lab: Quadcopter 6-DOF</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quadrotor Control Lab — 6-DOF Flight Dynamics Simulator</title>
+    <meta name="description" content="Interactive 6-DOF quadrotor simulator comparing PID, Sliding Mode, Super-Twisting SMC, and Model Predictive Control architectures.">
+    <link rel="stylesheet" href="css/style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        :root { --accent: #00d4ff; --bg: #0d0d10; --panel: #1a1a20; }
-        body { margin: 0; display: flex; font-family: 'Segoe UI', sans-serif; background: var(--bg); color: #e0e0e0; height: 100vh; overflow: hidden; }
-        
-        #viewport { flex-grow: 1; position: relative; }
-        #sidebar { width: 380px; background: var(--panel); border-left: 1px solid #333; display: flex; flex-direction: column; padding: 15px; overflow-y: auto; }
-        
-        .card { background: #25252b; padding: 12px; border-radius: 8px; margin-bottom: 12px; border: 1px solid #3a3a42; }
-        h2 { font-size: 0.85rem; color: var(--accent); text-transform: uppercase; margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 5px; }
-        
-        .control-row { margin: 8px 0; font-size: 0.8rem; display: flex; justify-content: space-between; align-items: center; }
-        input[type=range] { width: 60%; accent-color: var(--accent); }
-        select { background: #111; color: white; border: 1px solid #444; padding: 5px; border-radius: 4px; width: 100%; }
-        
-        #telemetry-overlay { position: absolute; top: 15px; left: 15px; pointer-events: none; font-family: monospace; font-size: 0.8rem; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 5px; border: 1px solid var(--accent); }
-        .chart-container { height: 180px; margin-top: 10px; }
-    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
-<div id="viewport">
-    <div id="telemetry-overlay">
-        <span style="color:var(--accent)">SYSTEM STATUS</span><br>
-        ALT: <span id="out-alt">0.00</span>m<br>
-        ERROR: <span id="out-err">0.00</span><br>
-        TRAJ: <span id="out-traj">IDLE</span>
+<div class="app-layout">
+
+    <!-- ============================================================
+         3D VIEWPORT
+         ============================================================ -->
+    <div id="viewport">
+        <div id="telemetry-overlay">
+            <div class="tel-title">Flight Telemetry</div>
+            <div class="tel-row">
+                <span class="tel-label">T</span>
+                <span class="tel-val" id="tel-time">0.0</span>s
+            </div>
+            <div class="tel-row">
+                <span class="tel-label">ALT</span>
+                <span class="tel-val" id="tel-alt">0.00</span>m
+            </div>
+            <div class="tel-row">
+                <span class="tel-label">X</span>
+                <span class="tel-val" id="tel-x">0.00</span>
+                <span class="tel-label" style="margin-left:8px">Z</span>
+                <span class="tel-val" id="tel-z">0.00</span>
+            </div>
+            <div class="tel-row">
+                <span class="tel-label">Vx</span>
+                <span class="tel-val" id="tel-vx">0.00</span>
+                <span class="tel-label" style="margin-left:4px">Vy</span>
+                <span class="tel-val" id="tel-vy">0.00</span>
+                <span class="tel-label" style="margin-left:4px">Vz</span>
+                <span class="tel-val" id="tel-vz">0.00</span>
+            </div>
+            <div class="tel-row">
+                <span class="tel-label">φ</span>
+                <span class="tel-val" id="tel-phi">0.0°</span>
+                <span class="tel-label" style="margin-left:4px">θ</span>
+                <span class="tel-val" id="tel-theta">0.0°</span>
+                <span class="tel-label" style="margin-left:4px">ψ</span>
+                <span class="tel-val" id="tel-psi">0.0°</span>
+            </div>
+            <div class="tel-row">
+                <span class="tel-label">‖e‖</span>
+                <span class="tel-val warn" id="tel-err">0.000</span>
+                <span class="tel-label" style="margin-left:8px">T</span>
+                <span class="tel-val" id="tel-thrust">0.00</span>N
+            </div>
+            <div class="tel-row">
+                <span id="rec-indicator">● REC</span>
+            </div>
+        </div>
     </div>
+
+    <!-- ============================================================
+         SIDEBAR
+         ============================================================ -->
+    <div id="sidebar">
+
+        <div class="sidebar-header">
+            <h1>⬡ Quadrotor Control Lab</h1>
+            <div class="subtitle">6-DOF Nonlinear Flight Dynamics &amp; Control</div>
+        </div>
+
+        <!-- Controller Selection -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Control Architecture</h2>
+                <span class="tag">outer + inner loop</span>
+            </div>
+            <select id="algo-select">
+                <option value="PID">Cascaded PID (Proportional-Integral-Derivative)</option>
+                <option value="SMC">Sliding Mode Control (Standard)</option>
+                <option value="STS">Super-Twisting SMC (2nd Order)</option>
+                <option value="MPC">Model Predictive Control (Receding Horizon)</option>
+            </select>
+            <div class="info-text" id="controller-info"></div>
+        </div>
+
+        <!-- Trajectory Selection -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Reference Trajectory</h2>
+            </div>
+            <select id="pattern-select">
+                <option value="HOVER">Hover (Fixed Setpoint)</option>
+                <option value="STEP">Step Response</option>
+                <option value="CIRCLE">Horizontal Circle</option>
+                <option value="HELIX">Ascending Helix</option>
+                <option value="FIGURE8">Lemniscate (Figure-8)</option>
+                <option value="SQUARE">Waypoint Square</option>
+                <option value="CUSTOM">Custom Waypoints</option>
+                <option value="KEYBOARD">Manual (Keyboard)</option>
+            </select>
+            <div class="info-text" id="trajectory-info"></div>
+
+            <!-- Keyboard hints (hidden by default) -->
+            <div id="keyboard-hint">
+                <span class="key-badge">W</span><span class="key-badge">A</span><span class="key-badge">S</span><span class="key-badge">D</span> Move XZ &nbsp;
+                <span class="key-badge">Space</span> Up &nbsp;
+                <span class="key-badge">Shift</span> Down &nbsp;
+                <span class="key-badge">Q</span><span class="key-badge">E</span> Yaw
+            </div>
+
+            <!-- Custom waypoints (hidden by default) -->
+            <div id="custom-wp-panel">
+                <div class="wp-input-row">
+                    <label>X</label><input type="number" id="wp-x" value="3" step="0.5">
+                    <label>Y</label><input type="number" id="wp-y" value="3" step="0.5">
+                    <label>Z</label><input type="number" id="wp-z" value="0" step="0.5">
+                    <button class="btn" id="btn-add-wp" style="flex:none;padding:5px 8px">+ Add</button>
+                </div>
+                <div id="wp-list"></div>
+                <button class="btn danger" id="btn-clear-wp" style="margin-top:6px;width:100%">Clear All Waypoints</button>
+            </div>
+        </div>
+
+        <!-- Gains Panel -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Gain Tuning</h2>
+                <span class="tag" id="gain-algo-tag">PID</span>
+            </div>
+            <div id="gains-panel"></div>
+        </div>
+
+        <!-- Environment -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Environment</h2>
+            </div>
+            <div class="env-row">
+                <span class="env-label">Wind disturbance</span>
+                <span class="env-value" id="wind-value">0.0 m/s</span>
+            </div>
+            <input type="range" id="wind-slider" min="0" max="8" step="0.1" value="0" style="width:100%">
+            <div class="env-row" style="margin-top:6px">
+                <span class="env-label">Simulation speed</span>
+                <span class="env-value" id="speed-value">1.0×</span>
+            </div>
+            <input type="range" id="speed-slider" min="0.25" max="4" step="0.25" value="1" style="width:100%">
+        </div>
+
+        <!-- Simulation Controls -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Controls</h2>
+            </div>
+            <div class="btn-group">
+                <button class="btn danger" id="btn-reset">↺ Reset</button>
+                <button class="btn" id="btn-pause">❚❚ Pause</button>
+                <button class="btn" id="btn-record">⏺ Record</button>
+            </div>
+            <div class="btn-group" style="margin-top:6px">
+                <button class="btn" id="btn-export">↓ Export CSV (Full)</button>
+                <button class="btn" id="btn-export-chart">↓ Export Charts</button>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Position Tracking</h2>
+                <span class="tag">desired vs actual</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="chart-position"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>Error &amp; Sliding Surface</h2>
+            </div>
+            <div class="chart-container">
+                <canvas id="chart-error"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>Control Effort</h2>
+                <span class="tag">thrust &amp; torques</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="chart-control"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>Phase Portrait</h2>
+                <span class="tag">altitude error vs velocity</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="chart-phase"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>Motor Speeds</h2>
+                <span class="tag">rad/s</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="chart-motors"></canvas>
+            </div>
+        </div>
+
+        <!-- Footer / Credits -->
+        <div style="padding: 12px 18px; font-size: 0.62rem; color: var(--text-dim); text-align: center; border-top: 1px solid var(--border); margin-top: auto;">
+            Quadrotor Control Lab &mdash; 6-DOF Rigid Body Dynamics with RK4 Integration<br>
+            Cascaded position/attitude control architecture &bull; X-frame motor mixing
+        </div>
+    </div>
+
 </div>
 
-<div id="sidebar">
-    <div class="card">
-        <h2>Control Architecture</h2>
-        <select id="algo">
-            <option value="PID">Cascaded PID</option>
-            <option value="SMC">Sliding Mode (Standard)</option>
-            <option value="STS">Super-Twisting SMC</option>
-            <option value="MPC">MPC (Predictive Horizon)</option>
-        </select>
-    </div>
+<!-- Scripts (load order matters — no modules for GitHub Pages compatibility) -->
+<script src="js/physics.js"></script>
+<script src="js/controllers.js"></script>
+<script src="js/trajectories.js"></script>
+<script src="js/drone3d.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/keyboard.js"></script>
+<script src="js/dataLogger.js"></script>
+<script src="js/app.js"></script>
 
-    <div class="card">
-        <h2>Trajectory Pattern</h2>
-        <select id="pattern">
-            <option value="HOVER">Fixed Setpoint (Hover)</option>
-            <option value="CIRCLE">Horizontal Circle</option>
-            <option value="FIGURE8">Lemniscate (Figure-8)</option>
-            <option value="SQUARE">Waypoints (Square)</option>
-        </select>
-    </div>
-
-    <div class="card">
-        <h2>Tuning & Environment</h2>
-        <div class="control-row">Proportional (Kp) <input type="range" id="kp" min="0" max="15" step="0.1" value="4"></div>
-        <div class="control-row">SMC Lambda (λ) <input type="range" id="lam" min="0.1" max="10" step="0.1" value="2"></div>
-        <div class="control-row">Wind Intensity <input type="range" id="wind" min="0" max="10" step="1" value="0"></div>
-    </div>
-
-    <div class="card">
-        <h2>State Space (Phase Plane)</h2>
-        <div class="chart-container"><canvas id="phaseChart"></canvas></div>
-    </div>
-
-    <div class="card">
-        <h2>Altitude Tracking</h2>
-        <div class="chart-container"><canvas id="timeChart"></canvas></div>
-    </div>
-    
-    <button onclick="resetSim()" style="padding:10px; background:#ff4444; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">EMERGENCY RESET</button>
-</div>
-
-<script>
-    // Scene and asset generation
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(60, (window.innerWidth - 380) / window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth - 380, window.innerHeight);
-    document.getElementById('viewport').appendChild(renderer.domElement);
-
-    const drone = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.05, 0.2), new THREE.MeshStandardMaterial({color: 0x444444}));
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.05, 0.8), new THREE.MeshStandardMaterial({color: 0x444444}));
-    drone.add(body, arm);
-    scene.add(drone);
-    scene.add(new THREE.GridHelper(100, 50, 0x333333, 0x222222));
-    scene.add(new THREE.AmbientLight(0xffffff, 0.5), new THREE.PointLight(0xffffff, 1));
-    camera.position.set(8, 8, 8);
-
-    // Path visualization
-    const pathGeometry = new THREE.BufferGeometry();
-    const pathMaterial = new THREE.LineBasicMaterial({ color: 0x00d4ff });
-    const pathLine = new THREE.Line(pathGeometry, pathMaterial);
-    scene.add(pathLine);
-
-    // Dynamics and state
-    let state = { pos: [0,0,0], vel: [0,0,0], rot: [0,0,0], w: [0,0,0] };
-    let target = { pos: [0,3,0], vel: [0,0,0] };
-    let intS = 0; // SMC Integrator
-    let time = 0;
-
-    // Plotting
-    const chartConf = (label, color) => ({
-        type: 'line', data: { labels: Array(30).fill(''), datasets: [{ label, borderColor: color, data: [], borderWidth: 2, pointRadius:0 }] },
-        options: { responsive: true, maintainAspectRatio: false, animation: false }
-    });
-    const phaseChart = new Chart(document.getElementById('phaseChart'), chartConf('Velocity vs Error', '#00d4ff'));
-    const timeChart = new Chart(document.getElementById('timeChart'), chartConf('Altitude', '#ff4444'));
-
-    // Core engine
-    function updateTrajectory(t) {
-        const pattern = document.getElementById('pattern').value;
-        if(pattern === 'CIRCLE') {
-            target.pos[0] = Math.cos(t * 0.5) * 5;
-            target.pos[2] = Math.sin(t * 0.5) * 5;
-            target.pos[1] = 4;
-        } else if(pattern === 'FIGURE8') {
-            target.pos[0] = Math.cos(t * 0.5) * 6;
-            target.pos[2] = Math.sin(t) * 3;
-            target.pos[1] = 4 + Math.sin(t*0.2);
-        } else {
-            target.pos = [0, 4, 0];
-        }
-    }
-
-    function controlLogic(dt) {
-        const algo = document.getElementById('algo').value;
-        const Kp = parseFloat(document.getElementById('kp').value);
-        const L = parseFloat(document.getElementById('lam').value);
-        const windPower = parseFloat(document.getElementById('wind').value);
-
-        // Position Error
-        let errY = target.pos[1] - state.pos[1];
-        let dErrY = -state.vel[1];
-
-        // 6-DOF Logic
-        let thrust = 9.81;
-        let torqueX = 0;
-
-        // Sliding Surface Definition
-        let s = dErrY + L * errY;
-
-        if(algo === "PID") {
-            thrust += errY * Kp + dErrY * (Kp * 0.5);
-        } else if(algo === "SMC") {
-            thrust += L * state.vel[1] + 5.0 * Math.sign(s);
-        } else if(algo === "STS") {
-            intS += -3.0 * Math.sign(s) * dt;
-            thrust += 5.0 * Math.sqrt(Math.abs(s)) * Math.sign(s) + intS;
-        } else if(algo === "MPC") {
-            // Receding horizon: looking at where target will be
-            thrust += (errY * Kp) + (target.pos[1] - state.pos[1]) * 2;
-        }
-
-        // Apply Physics
-        let wind = Math.sin(time * 2) * windPower;
-        state.vel[1] += (thrust - 9.81 + wind) * dt;
-        state.pos[1] += state.vel[1] * dt;
-        
-        // Tilt drone towards trajectory
-        state.pos[0] += (target.pos[0] - state.pos[0]) * 0.05;
-        state.pos[2] += (target.pos[2] - state.pos[2]) * 0.05;
-
-        // Update visuals
-        drone.position.set(state.pos[0], state.pos[1], state.pos[2]);
-        drone.rotation.z = (target.pos[0] - state.pos[0]) * 0.2;
-        drone.rotation.x = -(target.pos[2] - state.pos[2]) * 0.2;
-        camera.lookAt(drone.position);
-    }
-
-    function loop() {
-        time += 0.016;
-        updateTrajectory(time);
-        controlLogic(0.016);
-        
-        // Update telemetry
-        document.getElementById('out-alt').innerText = state.pos[1].toFixed(2);
-        document.getElementById('out-err').innerText = (target.pos[1] - state.pos[1]).toFixed(2);
-        
-        if(Math.round(time*60) % 10 === 0) {
-            updateCharts();
-        }
-
-        renderer.render(scene, camera);
-        requestAnimationFrame(loop);
-    }
-
-    function updateCharts() {
-        // Phase plot for error vs velocity
-        let err = target.pos[1] - state.pos[1];
-        phaseChart.data.datasets[0].data.push({x: err, y: state.vel[1]});
-        if(phaseChart.data.datasets[0].data.length > 50) phaseChart.data.datasets[0].data.shift();
-        phaseChart.update();
-
-        // Time plot for altitude
-        timeChart.data.datasets[0].data.push(state.pos[1]);
-        if(timeChart.data.datasets[0].data.length > 50) timeChart.data.datasets[0].data.shift();
-        timeChart.update();
-    }
-
-    function resetSim() { state = { pos:[0,0,0], vel:[0,0,0], rot:[0,0,0], w:[0,0,0] }; intS = 0; }
-    loop();
-</script>
 </body>
 </html>
